@@ -74,9 +74,13 @@ export interface FloatingModeState {
   active: boolean;
   scriptId: string;
   scriptTitle: string;
+  text?: string;
   currentPosition: number;
+  progressPercent?: number;
   scrollSpeed: number;
   fontSize: number;
+  fontFamily?: string;
+  textAlign?: string;
   opacity: number; // 20, 40, 60, 80, 100
   textOpacity?: number;
   windowPosition: { x: number; y: number };
@@ -86,6 +90,7 @@ export interface FloatingModeState {
   isPlaying: boolean;
   theme: string;
   mirrored: boolean;
+  readingSettings?: TeleprompterSettings;
   timestamp: number;
 }
 

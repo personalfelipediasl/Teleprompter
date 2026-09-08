@@ -7,6 +7,17 @@ import {VitePWA} from 'vite-plugin-pwa';
 export default defineConfig(() => {
   return {
     plugins: [
+      {
+        name: 'vite-client-safe-ws',
+        transform(code: string, id: string) {
+          if (id.includes('vite/dist/client/client.mjs') || id.endsWith('/@vite/client')) {
+            return code.replace(
+              'ws.send(JSON.stringify(data));',
+              'if (typeof ws !== "undefined" && ws && ws.readyState === 1) { ws.send(JSON.stringify(data)); }'
+            );
+          }
+        },
+      },
       react(),
       tailwindcss(),
       VitePWA({
@@ -51,8 +62,7 @@ export default defineConfig(() => {
           skipWaiting: true,
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],

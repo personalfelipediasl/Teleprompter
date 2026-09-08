@@ -14,6 +14,7 @@ import { FloatingPrompterWindow } from './components/floating/FloatingPrompterWi
 import { FloatingReturnBanner } from './components/floating/FloatingReturnBanner';
 import { FloatingInstructionsModal } from './components/floating/FloatingInstructionsModal';
 import { PiPStandbyScreen } from './components/floating/PiPStandbyScreen';
+import { PiPUnavailableModal } from './components/floating/PiPUnavailableModal';
 import { NativeIOSBridge } from './services/nativeIosBridge';
 import { EnvironmentDetector } from './services/environmentDetector';
 
@@ -33,6 +34,11 @@ export function App() {
   const [persistedFloatingState, setPersistedFloatingState] = useState<FloatingModeState | null>(null);
   const [showReturnBanner, setShowReturnBanner] = useState<boolean>(false);
   const [instructionsModalScript, setInstructionsModalScript] = useState<Script | null>(null);
+  const [pipUnavailableModal, setPipUnavailableModal] = useState<{
+    isOpen: boolean;
+    reason?: string;
+    script?: Script;
+  } | null>(null);
 
   // Load initial DB data & restore floating state
   useEffect(() => {
@@ -217,41 +223,61 @@ export function App() {
   }, []);
 
   // Launch Floating Mode
-  const handleStartFloating = (
+  const handleStartFloating = async (
     script: Script,
     initialPos: number = 0,
     initialPlay: boolean = false
   ) => {
-    const targetPos = initialPos || script.lastPosition || 0;
+    const targetPos = Math.round(initialPos || script.lastPosition || 0);
 
-    // Persist active state in Storage
+    // Persist active state in Storage according to Section 6
     const newState: FloatingModeState = {
       active: true,
       scriptId: script.id,
       scriptTitle: script.title,
+      text: script.content,
       currentPosition: targetPos,
+      progressPercent: script.estimatedSeconds
+        ? Math.min(100, (targetPos / Math.max(1, script.estimatedSeconds * 50)) * 100)
+        : 0,
       scrollSpeed: settings.speed,
       fontSize: settings.fontSize,
+      fontFamily: settings.fontFamily,
+      textAlign: settings.textAlign,
       opacity: settings.backgroundOpacity,
+      textOpacity: 100,
       windowPosition: { x: 20, y: 55 },
       windowSize: 'medium',
       isPlaying: initialPlay,
-      theme: 'dark',
+      theme: settings.backgroundColor,
       mirrored: settings.mirrorHorizontal,
+      readingSettings: settings,
       timestamp: Date.now(),
     };
 
-    StorageService.saveFloatingState(newState);
+    await StorageService.saveFloatingState(newState);
     setPersistedFloatingState(newState);
     setActiveScript(script);
 
-    // Attempt native PiP bridge directly on user tap
-    const caps = EnvironmentDetector.getCapabilities();
-    if (caps.supportsPictureInPicture) {
-      NativeIOSBridge.requestFloatingPrompter(script, settings, targetPos, {
-        onExit: () => {
+    // Verify availability using real capability check
+    const check = await NativeIOSBridge.isPictureInPicturePossible();
+    if (!check.possible) {
+      setPipUnavailableModal({
+        isOpen: true,
+        reason: check.reason,
+        script,
+      });
+      return;
+    }
+
+    try {
+      const res = await NativeIOSBridge.start(script, settings, targetPos, {
+        onExit: (finalPos) => {
           setPipActiveScript(null);
           setShowReturnBanner(true);
+          if (typeof finalPos === 'number') {
+            setPersistedFloatingState((prev) => (prev ? { ...prev, currentPosition: finalPos } : null));
+          }
         },
         onPlayPause: (playing) => {
           setFloatingInitialPlaying(playing);
@@ -259,33 +285,28 @@ export function App() {
         onPositionChange: (pos) => {
           setPersistedFloatingState((prev) => (prev ? { ...prev, currentPosition: pos } : null));
         },
-      })
-        .then((res) => {
-          if (res.success) {
-            setPipActiveScript(script);
-            setInAppFloatingScript(null);
-            // If running inside Capacitor on iOS, minimize the app to reveal native camera
-            if ((window as any).Capacitor?.Plugins?.App?.minimizeApp) {
-              (window as any).Capacitor.Plugins.App.minimizeApp().catch(() => {});
-            }
-          } else {
-            // Fallback to in-app floating overlay if browser rejected PiP
-            setFloatingInitialPosition(targetPos);
-            setFloatingInitialPlaying(initialPlay);
-            setInAppFloatingScript(script);
-          }
-        })
-        .catch(() => {
-          // Fallback
-          setFloatingInitialPosition(targetPos);
-          setFloatingInitialPlaying(initialPlay);
-          setInAppFloatingScript(script);
+      });
+
+      if (res.success) {
+        setPipActiveScript(script);
+        setInAppFloatingScript(null);
+        // If running inside Capacitor on iOS, minimize the app to reveal native camera
+        if ((window as any).Capacitor?.Plugins?.App?.minimizeApp) {
+          (window as any).Capacitor.Plugins.App.minimizeApp().catch(() => {});
+        }
+      } else {
+        setPipUnavailableModal({
+          isOpen: true,
+          reason: res.message,
+          script,
         });
-    } else {
-      // In-app fallback for browsers with no PiP
-      setFloatingInitialPosition(targetPos);
-      setFloatingInitialPlaying(initialPlay);
-      setInAppFloatingScript(script);
+      }
+    } catch (err: any) {
+      setPipUnavailableModal({
+        isOpen: true,
+        reason: err?.message || 'Falha ao iniciar Picture-in-Picture no dispositivo.',
+        script,
+      });
     }
   };
 
@@ -311,6 +332,13 @@ export function App() {
         ...prev,
         speed: persistedFloatingState.scrollSpeed || prev.speed,
         fontSize: persistedFloatingState.fontSize || prev.fontSize,
+        fontFamily: persistedFloatingState.fontFamily || prev.fontFamily,
+        textAlign: (persistedFloatingState.textAlign as any) || prev.textAlign,
+        mirrorHorizontal:
+          persistedFloatingState.mirrored !== undefined
+            ? persistedFloatingState.mirrored
+            : prev.mirrorHorizontal,
+        backgroundOpacity: persistedFloatingState.opacity || prev.backgroundOpacity,
       }));
       setShowReturnBanner(false);
       setCurrentRoute('teleprompter');
@@ -417,6 +445,26 @@ export function App() {
             handleStartCamera(s);
           }}
           scriptTitle={instructionsModalScript.title}
+        />
+      )}
+
+      {/* Picture-in-Picture Unavailable Modal */}
+      {pipUnavailableModal && (
+        <PiPUnavailableModal
+          isOpen={pipUnavailableModal.isOpen}
+          reason={pipUnavailableModal.reason}
+          isSafariPWA={
+            EnvironmentDetector.getCapabilities().isSafari &&
+            !EnvironmentDetector.getCapabilities().isNativeCapacitor
+          }
+          onClose={() => setPipUnavailableModal(null)}
+          onUseCameraStudio={() => {
+            const target = pipUnavailableModal.script || activeScript;
+            setPipUnavailableModal(null);
+            if (target) {
+              handleStartCamera(target);
+            }
+          }}
         />
       )}
 

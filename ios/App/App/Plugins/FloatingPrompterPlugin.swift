@@ -4,10 +4,8 @@
 //
 //  Implemented using official Apple Public APIs:
 //  - AVKit (AVPictureInPictureController)
-//  - AVSampleBufferDisplayLayer / AVPictureInPictureVideoCallViewController (iOS 15+)
-//
-//  Permits the floating teleprompter window to remain persistent when the user exits
-//  the application and opens the native iPhone Camera app.
+//  - AVPictureInPictureVideoCallViewController (iOS 15+)
+//  - AVFoundation (AVAudioSession with .playback and .mixWithOthers)
 //
 
 import Foundation
@@ -15,88 +13,81 @@ import AVKit
 import UIKit
 
 @objc(FloatingPrompterPlugin)
-public class FloatingPrompterPlugin: NSObject, AVPictureInPictureControllerDelegate {
-    private var pipController: AVPictureInPictureController?
-    private var displayLayer: AVSampleBufferDisplayLayer?
-    private var prompterView: UIView?
-    private var displayLink: CADisplayLink?
+public class FloatingPrompterPlugin: NSObject {
     
-    // Prompter State
-    private var scriptLines: [String] = []
-    private var scrollOffset: CGFloat = 0.0
-    private var scrollSpeed: CGFloat = 1.0
-    private var fontSize: CGFloat = 28.0
-    private var isPlaying: Bool = false
-    private var textOpacity: CGFloat = 1.0
-    private var bgOpacity: CGFloat = 0.85
-
     @objc public func isSupported(_ call: Any) {
-        let supported = AVPictureInPictureController.isPictureInPictureSupported()
-        // Returns true on iOS 14+ devices supported
-        print("[FloatingPrompterPlugin] PiP Supported: \(supported)")
+        let supported = TeleprompterPiPManager.isSupported()
+        respond(call: call, data: ["supported": supported])
     }
 
     @objc public func startFloating(_ call: Any) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.setupAudioSessionForPiP()
-            self.startPictureInPictureSession()
+        let params = extractDictionary(from: call)
+        let id = params["id"] as? String ?? UUID().uuidString
+        let title = params["scriptTitle"] as? String ?? params["title"] as? String ?? "Roteiro"
+        let content = params["content"] as? String ?? ""
+        let initialPosition = params["initialPosition"] as? Double ?? 0.0
+        let speed = params["speed"] as? Double ?? 1.0
+        let fontSize = params["fontSize"] as? Double ?? 32.0
+        let textColor = params["textColor"] as? String ?? "#FFFFFF"
+        let bgColor = params["bgColor"] as? String ?? "#121318"
+        let opacity = params["opacity"] as? Double ?? 1.0
+        let isPlaying = params["isPlaying"] as? Bool ?? true
+        
+        let payload = TeleprompterScriptPayload(
+            id: id,
+            title: title,
+            content: content,
+            initialPosition: initialPosition,
+            speed: speed,
+            fontSize: fontSize,
+            textColor: textColor,
+            bgColor: bgColor,
+            opacity: opacity,
+            isPlaying: isPlaying
+        )
+        
+        DispatchQueue.main.async {
+            guard let keyWindow = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first else {
+                return
+            }
+            TeleprompterPiPManager.shared.start(with: payload, in: keyWindow)
+            self.respond(call: call, data: ["success": true])
         }
     }
 
     @objc public func updateSettings(_ call: Any) {
-        // Updates speed, font size, opacity dynamically
+        let params = extractDictionary(from: call)
+        if let speed = params["speed"] as? Double {
+            TeleprompterPiPManager.shared.setSpeed(speed)
+        }
+        if let content = params["content"] as? String {
+            TeleprompterPiPManager.shared.updateContent(content)
+        }
+        respond(call: call, data: ["success": true])
     }
 
     @objc public func stopFloating(_ call: Any) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.pipController?.stopPictureInPicture()
-            self.displayLink?.invalidate()
-            self.displayLink = nil
+        DispatchQueue.main.async {
+            TeleprompterPiPManager.shared.stop()
+            self.respond(call: call, data: ["success": true])
         }
     }
-
-    private func setupAudioSessionForPiP() {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            print("[FloatingPrompterPlugin] Audio session error: \(error)")
+    
+    private func extractDictionary(from call: Any) -> [String: Any] {
+        if let dict = call as? [String: Any] { return dict }
+        let mirror = Mirror(reflecting: call)
+        for child in mirror.children {
+            if child.label == "options", let dict = child.value as? [String: Any] {
+                return dict
+            }
         }
+        return [:]
     }
-
-    private func startPictureInPictureSession() {
-        guard AVPictureInPictureController.isPictureInPictureSupported() else {
-            print("[FloatingPrompterPlugin] PiP not supported on this device")
-            return
+    
+    private func respond(call: Any, data: [String: Any]) {
+        if let selector = NSSelectorFromString("resolve:") as Selector?,
+           (call as AnyObject).responds(to: selector) {
+            _ = (call as AnyObject).perform(selector, with: data)
         }
-
-        if #available(iOS 15.0, *) {
-            // Using AVPictureInPictureVideoCallViewController for custom UIView rendering
-            // This displays live scrolling text inside Apple's native PiP floating window
-            self.isPlaying = true
-            self.startRenderLoop()
-        }
-    }
-
-    private func startRenderLoop() {
-        self.displayLink = CADisplayLink(target: self, selector: #selector(renderTick))
-        self.displayLink?.preferredFramesPerSecond = 60
-        self.displayLink?.add(to: .main, forMode: .common)
-    }
-
-    @objc private func renderTick() {
-        guard isPlaying else { return }
-        scrollOffset += (scrollSpeed * 0.8)
-    }
-
-    // MARK: - AVPictureInPictureControllerDelegate
-    public func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        print("[FloatingPrompterPlugin] PiP Will Start - Teleprompter is now floating")
-    }
-
-    public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        print("[FloatingPrompterPlugin] PiP Did Stop - User returned or closed PiP")
     }
 }
