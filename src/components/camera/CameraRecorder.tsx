@@ -405,7 +405,7 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
   const getOverlayPositionStyle = () => {
     switch (overlayPosition) {
       case 'top':
-        return 'top-16';
+        return 'top-[calc(max(env(safe-area-inset-top,0px),48px)+3.85rem)]';
       case 'bottom':
         return 'bottom-28';
       default:
@@ -415,6 +415,16 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
 
   return (
     <div id="camera-studio-root" className="relative w-full h-screen bg-black overflow-hidden select-none">
+      {/* Barra Preta Superior Protetora para iPhone (Dynamic Island / Notch / Relógio e Bateria) */}
+      <div
+        id="iphone-status-bar-shield"
+        aria-hidden="true"
+        className="absolute top-0 left-0 right-0 z-40 bg-black pointer-events-none border-b border-white/5"
+        style={{
+          height: 'max(env(safe-area-inset-top, 0px), 48px)',
+        }}
+      />
+
       {/* Background Live Camera Preview */}
       <video
         ref={videoPreviewRef}
@@ -549,19 +559,25 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
       )}
 
       {/* TOP HUD BAR: Recording Status, Resolution Badge, Audio VU Meter, Tools */}
-      <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-auto">
+      <div
+        id="camera-top-hud-bar"
+        className="absolute left-0 right-0 z-30 flex items-center justify-between px-2.5 sm:px-4 gap-2 pointer-events-auto"
+        style={{
+          top: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 6px)',
+        }}
+      >
         {/* Left: REC Indicator and Timer */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2.5 bg-slate-950/85 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/10 shadow-lg">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2 bg-slate-950/90 backdrop-blur-md px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-2xl border border-white/10 shadow-lg">
             {isRecording ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <span
-                  className={`w-3 h-3 rounded-full ${
+                  className={`w-2.5 h-2.5 rounded-full ${
                     isPaused ? 'bg-amber-400' : 'bg-red-500 animate-ping'
                   }`}
                 />
                 <span
-                  className={`font-mono font-bold text-sm tracking-wider ${
+                  className={`font-mono font-bold text-xs sm:text-sm tracking-wider ${
                     isPaused ? 'text-amber-400' : 'text-red-400'
                   }`}
                 >
@@ -569,15 +585,15 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-xs text-slate-300">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-semibold">Estúdio Pronto</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-300">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-semibold whitespace-nowrap">Estúdio Pronto</span>
               </div>
             )}
           </div>
 
           {/* Resolution Badge */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/10 text-xs font-mono text-cyan-300">
+          <div className="hidden md:flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/10 text-xs font-mono text-cyan-300">
             <span>{resolution === 'auto' ? streamResolutionInfo : resolution.toUpperCase()}</span>
             <span className="opacity-40">•</span>
             <span className="text-[10px] text-slate-400">30 FPS</span>
@@ -593,11 +609,11 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
         </div>
 
         {/* Right: Quick Action Buttons & Settings Drawer Toggle */}
-        <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-lg">
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-950/90 backdrop-blur-md p-1 sm:p-1.5 rounded-2xl border border-white/10 shadow-lg">
           {/* Prompter Visibility Toggle */}
           <button
             onClick={() => setShowPrompter(!showPrompter)}
-            className={`p-2.5 rounded-xl transition ${
+            className={`p-1.5 sm:p-2.5 rounded-xl transition ${
               showPrompter ? 'text-cyan-400 bg-cyan-950/40 border border-cyan-500/30' : 'text-slate-400 hover:text-white'
             }`}
             title={showPrompter ? 'Ocultar Prompter' : 'Exibir Prompter'}
@@ -609,7 +625,7 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
           <button
             onClick={toggleCameraFacing}
             disabled={isRecording}
-            className="p-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 disabled:opacity-30 transition"
+            className="p-1.5 sm:p-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 disabled:opacity-30 transition"
             title="Trocar Câmera (Frontal / Traseira)"
           >
             <RotateCw className="w-4 h-4" />
@@ -619,7 +635,7 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
           {facingMode === 'user' && (
             <button
               onClick={() => setMirrorPreview(!mirrorPreview)}
-              className={`p-2.5 rounded-xl transition ${
+              className={`p-1.5 sm:p-2.5 rounded-xl transition ${
                 mirrorPreview ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-400 hover:text-white'
               }`}
               title={mirrorPreview ? 'Espelhamento Selfie Ativo' : 'Espelhamento Desativado'}
@@ -632,7 +648,7 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
           <button
             id="btn-open-camera-settings"
             onClick={() => setShowSettingsDrawer(!showSettingsDrawer)}
-            className={`p-2.5 rounded-xl transition ${
+            className={`p-1.5 sm:p-2.5 rounded-xl transition ${
               showSettingsDrawer ? 'bg-cyan-500 text-slate-950' : 'text-slate-300 hover:bg-white/10'
             }`}
             title="Configurações de Câmera, Resolução e Enquadramento"
@@ -644,10 +660,10 @@ export const CameraRecorder: React.FC<CameraRecorderProps> = ({
           <button
             onClick={onExit}
             disabled={isRecording}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition ml-1"
+            className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition"
             title="Voltar aos Roteiros"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>

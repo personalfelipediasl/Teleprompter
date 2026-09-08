@@ -52,7 +52,7 @@ export const FloatingPrompterWindow: React.FC<FloatingPrompterWindowProps> = ({
   onPositionChange,
 }) => {
   // Window position & size states
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 16, y: 50 });
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 16, y: 68 });
   const [sizePreset, setSizePreset] = useState<FloatingWindowSizePreset>('medium');
   const [customSize, setCustomSize] = useState<{ width: number; height: number }>({
     width: 360,
@@ -74,7 +74,7 @@ export const FloatingPrompterWindow: React.FC<FloatingPrompterWindowProps> = ({
 
   // Dragging state
   const isDraggingRef = useRef(false);
-  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 16, posY: 50 });
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 16, posY: 68 });
 
   // Load saved window position & size from storage
   useEffect(() => {
@@ -82,9 +82,9 @@ export const FloatingPrompterWindow: React.FC<FloatingPrompterWindowProps> = ({
       const saved = await StorageService.getFloatingState();
       if (saved) {
         if (saved.windowPosition) {
-          // Clamp inside viewport
+          // Clamp inside viewport respecting top safe area (at least 54px from top for iPhone notch)
           const x = Math.max(10, Math.min(window.innerWidth - 300, saved.windowPosition.x));
-          const y = Math.max(10, Math.min(window.innerHeight - 150, saved.windowPosition.y));
+          const y = Math.max(54, Math.min(window.innerHeight - 150, saved.windowPosition.y));
           setPosition({ x, y });
         }
         if (saved.windowSize) {
@@ -216,7 +216,7 @@ export const FloatingPrompterWindow: React.FC<FloatingPrompterWindowProps> = ({
     const maxY = Math.max(10, window.innerHeight - activeDimensions.height - 20);
 
     const newX = Math.max(10, Math.min(maxX, dragStartRef.current.posX + dx));
-    const newY = Math.max(10, Math.min(maxY, dragStartRef.current.posY + dy));
+    const newY = Math.max(54, Math.min(maxY, dragStartRef.current.posY + dy));
 
     setPosition({ x: newX, y: newY });
   };

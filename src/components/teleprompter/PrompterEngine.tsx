@@ -433,6 +433,16 @@ export const PrompterEngine: React.FC<PrompterEngineProps> = ({
       onWheel={handleWheel}
       onClick={resetControlsTimer}
     >
+      {/* Barra Preta Superior Protetora para iPhone (Dynamic Island / Notch / Relógio e Bateria) */}
+      <div
+        id="iphone-prompter-shield"
+        aria-hidden="true"
+        className="absolute top-0 left-0 right-0 z-40 bg-black pointer-events-none border-b border-white/5"
+        style={{
+          height: 'max(env(safe-area-inset-top, 0px), 48px)',
+        }}
+      />
+
       {/* Visual Guide Line */}
       {settings.guideLine && (
         <div

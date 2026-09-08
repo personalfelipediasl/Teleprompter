@@ -71,7 +71,10 @@ export const PrompterControls: React.FC<PrompterControlsProps> = ({
   return (
     <div
       id="prompter-controls-overlay"
-      className="flex flex-col justify-between p-4 pointer-events-none w-full h-full"
+      className="flex flex-col justify-between px-3 sm:px-4 pb-4 pointer-events-none w-full h-full"
+      style={{
+        paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)',
+      }}
     >
       {/* Top Bar */}
       <div className="flex items-center justify-between gap-3 pointer-events-auto bg-slate-950/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-slate-800 shadow-xl max-w-4xl mx-auto w-full">

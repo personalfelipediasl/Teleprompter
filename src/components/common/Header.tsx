@@ -29,7 +29,10 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header
       id="app-main-header"
-      className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md px-4 py-3"
+      className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-md px-4 pb-3"
+      style={{
+        paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 0px) + 0.75rem)',
+      }}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
         {/* Left branding or back button */}
