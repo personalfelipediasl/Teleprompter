@@ -43,11 +43,18 @@ export class EnvironmentDetector {
       typeof (window as any).Capacitor.isNativePlatform === 'function' &&
       (window as any).Capacitor.isNativePlatform();
 
-    // PiP support
-    const supportsPictureInPicture =
+    // PiP support for standard browsers and iOS WebKit / Safari
+    const supportsStandardPiP =
       'pictureInPictureEnabled' in document &&
       typeof HTMLVideoElement !== 'undefined' &&
       'requestPictureInPicture' in HTMLVideoElement.prototype;
+
+    const supportsWebKitPiP =
+      typeof HTMLVideoElement !== 'undefined' &&
+      ('webkitSetPresentationMode' in HTMLVideoElement.prototype ||
+        'webkitSupportsPresentationMode' in HTMLVideoElement.prototype);
+
+    const supportsPictureInPicture = supportsStandardPiP || supportsWebKitPiP;
 
     // Native overlay in iOS is exclusively through PiP / AVPictureInPictureController
     const supportsNativeOverlay = isNativeCapacitor || supportsPictureInPicture;

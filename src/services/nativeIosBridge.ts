@@ -17,9 +17,11 @@ export class NativeIOSBridge {
   public static async requestFloatingPrompter(
     script: Script,
     settings: TeleprompterSettings,
+    initialPosition?: number,
     callbacks?: {
       onExit?: () => void;
       onPlayPause?: (playing: boolean) => void;
+      onPositionChange?: (position: number) => void;
       onSpeedChange?: (speed: number) => void;
     }
   ): Promise<NativeBridgeResponse> {
@@ -47,15 +49,20 @@ export class NativeIOSBridge {
       try {
         const lines = script.content.split('\n').filter((l) => l.trim().length > 0);
         await PiPPrompterService.startPiP(lines, {
+          title: script.title,
           speed: settings.speed,
           fontSize: settings.fontSize,
           textColor: settings.textColor,
           bgColor: settings.backgroundColor,
+          initialScroll: initialPosition || script.lastPosition || 0,
           onExit: () => {
             if (callbacks?.onExit) callbacks.onExit();
           },
           onTogglePlay: (playing) => {
             if (callbacks?.onPlayPause) callbacks.onPlayPause(playing);
+          },
+          onPositionChange: (pos) => {
+            if (callbacks?.onPositionChange) callbacks.onPositionChange(pos);
           },
         });
         return { success: true, mode: 'pip' };

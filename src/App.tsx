@@ -13,6 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { FloatingPrompterWindow } from './components/floating/FloatingPrompterWindow';
 import { FloatingReturnBanner } from './components/floating/FloatingReturnBanner';
 import { FloatingInstructionsModal } from './components/floating/FloatingInstructionsModal';
+import { PiPStandbyScreen } from './components/floating/PiPStandbyScreen';
 import { NativeIOSBridge } from './services/nativeIosBridge';
 import { EnvironmentDetector } from './services/environmentDetector';
 
@@ -25,6 +26,7 @@ export function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Floating Mode States
+  const [pipActiveScript, setPipActiveScript] = useState<Script | null>(null);
   const [inAppFloatingScript, setInAppFloatingScript] = useState<Script | null>(null);
   const [floatingInitialPosition, setFloatingInitialPosition] = useState<number>(0);
   const [floatingInitialPlaying, setFloatingInitialPlaying] = useState<boolean>(false);
@@ -207,6 +209,13 @@ export function App() {
     setCurrentRoute('camera');
   };
 
+  // Exit native PiP and return to app
+  const handleExitPiPStandby = useCallback(() => {
+    NativeIOSBridge.stopFloatingPrompter();
+    setPipActiveScript(null);
+    setShowReturnBanner(true);
+  }, []);
+
   // Launch Floating Mode
   const handleStartFloating = (
     script: Script,
@@ -234,24 +243,49 @@ export function App() {
 
     StorageService.saveFloatingState(newState);
     setPersistedFloatingState(newState);
-
-    // Set active script & launch window
     setActiveScript(script);
-    setFloatingInitialPosition(targetPos);
-    setFloatingInitialPlaying(initialPlay);
-    setInAppFloatingScript(script);
 
-    // Attempt native PiP bridge on iOS if requested
+    // Attempt native PiP bridge directly on user tap
     const caps = EnvironmentDetector.getCapabilities();
     if (caps.supportsPictureInPicture) {
-      NativeIOSBridge.requestFloatingPrompter(script, settings, {
+      NativeIOSBridge.requestFloatingPrompter(script, settings, targetPos, {
         onExit: () => {
+          setPipActiveScript(null);
           setShowReturnBanner(true);
         },
         onPlayPause: (playing) => {
           setFloatingInitialPlaying(playing);
         },
-      }).catch(console.warn);
+        onPositionChange: (pos) => {
+          setPersistedFloatingState((prev) => (prev ? { ...prev, currentPosition: pos } : null));
+        },
+      })
+        .then((res) => {
+          if (res.success) {
+            setPipActiveScript(script);
+            setInAppFloatingScript(null);
+            // If running inside Capacitor on iOS, minimize the app to reveal native camera
+            if ((window as any).Capacitor?.Plugins?.App?.minimizeApp) {
+              (window as any).Capacitor.Plugins.App.minimizeApp().catch(() => {});
+            }
+          } else {
+            // Fallback to in-app floating overlay if browser rejected PiP
+            setFloatingInitialPosition(targetPos);
+            setFloatingInitialPlaying(initialPlay);
+            setInAppFloatingScript(script);
+          }
+        })
+        .catch(() => {
+          // Fallback
+          setFloatingInitialPosition(targetPos);
+          setFloatingInitialPlaying(initialPlay);
+          setInAppFloatingScript(script);
+        });
+    } else {
+      // In-app fallback for browsers with no PiP
+      setFloatingInitialPosition(targetPos);
+      setFloatingInitialPlaying(initialPlay);
+      setInAppFloatingScript(script);
     }
   };
 
@@ -353,6 +387,20 @@ export function App() {
         />
       )}
 
+      {/* Standby screen while Picture-in-Picture is active and app is waiting/backgrounded */}
+      {pipActiveScript && (
+        <PiPStandbyScreen
+          script={pipActiveScript}
+          settings={settings}
+          onExitStandby={handleExitPiPStandby}
+          onOpenInAppCamera={() => {
+            const target = pipActiveScript;
+            handleExitPiPStandby();
+            handleStartCamera(target);
+          }}
+        />
+      )}
+
       {/* Instructions Modal */}
       {instructionsModalScript && (
         <FloatingInstructionsModal
@@ -418,7 +466,7 @@ export function App() {
                 onOpenScript={handleOpenScript}
                 onStartPrompter={handleStartPrompter}
                 onStartCamera={handleStartCamera}
-                onStartFloating={(s) => setInstructionsModalScript(s)}
+                onStartFloating={(s) => handleStartFloating(s)}
                 onDuplicateScript={handleDuplicateScript}
                 onDeleteScript={handleDeleteScript}
                 onToggleFavorite={handleToggleFavorite}
@@ -432,7 +480,7 @@ export function App() {
                 onSave={handleSaveScript}
                 onStartPrompter={handleStartPrompter}
                 onStartCamera={handleStartCamera}
-                onStartFloating={(s) => setInstructionsModalScript(s)}
+                onStartFloating={(s) => handleStartFloating(s)}
               />
             )}
 

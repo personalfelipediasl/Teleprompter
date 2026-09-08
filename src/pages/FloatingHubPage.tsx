@@ -106,11 +106,18 @@ export const FloatingHubPage: React.FC<FloatingHubPageProps> = ({
 
               <button
                 id="btn-hub-start-floating"
-                onClick={() => setShowInstructionsModal(true)}
+                onClick={() => onStartInAppFloating(selectedScript)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 text-xs font-black shadow-lg shadow-cyan-500/30 transition active:scale-95"
               >
                 <Layers className="w-4 h-4 text-slate-950 stroke-[2.5]" />
                 <span>ATIVAR MODO FLUTUAR</span>
+              </button>
+
+              <button
+                onClick={() => setShowInstructionsModal(true)}
+                className="w-full text-center text-[11px] text-slate-400 hover:text-cyan-300 transition py-1"
+              >
+                Ver instruções do Picture-in-Picture
               </button>
             </div>
 
