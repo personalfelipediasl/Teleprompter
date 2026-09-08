@@ -1,0 +1,6 @@
+{
+  "name": "Teleprompter Profissional",
+  "description": "Aplicativo profissional de teleprompter e estúdio de gravação de vídeo com modo flutuante, espelhamento, controle de voz, gravação e suporte PWA offline.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
